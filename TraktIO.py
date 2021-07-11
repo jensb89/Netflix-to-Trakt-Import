@@ -10,7 +10,7 @@ import config
 import json
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=config.LOG_LEVEL)
 
 
 class TraktIO(object):

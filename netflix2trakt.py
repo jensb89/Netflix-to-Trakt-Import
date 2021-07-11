@@ -50,6 +50,9 @@ tmdbSeason = Season()
 for show in netflixHistory.shows:
     logging.info("Searching %s" % show.name)
     tmdbShow = tmdbTv.search(show.name)
+    if len(tmdbShow) == 0:
+        logging.warning("Show %s not found on TMDB!" % show.name)
+        continue
     showId = tmdbShow[0]["id"]
     details = tmdbTv.details(show_id = showId, append_to_response="")
     numSeasons = details.number_of_seasons
