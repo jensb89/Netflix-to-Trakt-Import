@@ -1,0 +1,7 @@
+Netflix2TraktImportLog.log
+dev/
+.vscode/
+__pycache__
+.python-version
+*.csv
+traktAuth.json
