@@ -28,12 +28,18 @@ If no match was found at all, the episode / movie is left out.
 Just clone this repo, fill in the API keys and language information in the config.py file.
 See how to register API access below.
 
+Install the requirements (trakt.tv and tmdb) by calling:
+```bash
+python -m pip install -r requirements.txt
+```
+
 Also, of course a NetflixViewingHistory.csv export file is needed. This can be obtained directly from the netflix page.
 Compare https://help.netflix.com/node/101917 for more information.
 
 To use the script simply call 
-
+```bash
 python netflix2trakt.py
+```
 
 ### Register API Access at Trakt
 * Go to "Settings" under your profile
@@ -45,6 +51,7 @@ python netflix2trakt.py
 * Make note of your details to be used later.
 
 ## Future improvements:
+* Send multiple episodes to trakt in one call instead of making one API call per entry 
 * Check found TMDB shows/movies before sending to trakt.tv
 * Better print outputs
 * Code documentation improvement
