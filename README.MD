@@ -41,6 +41,11 @@ To use the script simply call
 python netflix2trakt.py
 ```
 
+For printing only the non-found shows just execute
+```bash
+grep "No Tmdb ID found" Netflix2TraktImportLog.log 
+```
+
 ### Register API Access at Trakt
 * Go to "Settings" under your profile
 * Select "Your API Applications"
@@ -56,3 +61,5 @@ python netflix2trakt.py
 * Better print outputs
 * Code documentation improvement
 * Use only trakt Search and make TMDB optional
+
+I did this on one weekened, so there is probably room for improvement :)
