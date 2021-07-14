@@ -159,6 +159,7 @@ for show in netflixHistory.shows:
             if episode.tmdbId is not None:
                 print("Adding epsiode to trakt:")
                 for watchedTime in episode.watchedAt:
+                    watchedTime = re.sub('[^0-9]', '.', watchedTime)
                     time = datetime.datetime.strptime(watchedTime + ' 20:15', '%d.%m.%y %H:%M')
                     addInfo = {
                         "episodes": [
@@ -179,6 +180,7 @@ for movie in netflixHistory.movies:
     if movie.tmdbId is not None:
         for watchedTime in movie.watchedAt:
             print("Adding movie to trakt:")
+            watchedTime = re.sub('[^0-9]', '.', watchedTime)
             time = datetime.datetime.strptime(watchedTime + ' 20:15', '%d.%m.%y %H:%M')
             addInfo = {
                         "movies": [
