@@ -96,7 +96,7 @@ for show in netflixHistory.shows:
                         break
                 if not(found):
                     # Try finding episode number in the name
-                    tvshowregex = re.compile(r'Folge (\d{1,2})|Episode (\d{1,2})')
+                    tvshowregex = re.compile(r'(?:Folge|Episode) (\d{1,2})')
                     res = tvshowregex.search( episode.name )
                     if res is not None:
                         number = int(res.group(1))
