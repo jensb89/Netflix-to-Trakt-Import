@@ -160,7 +160,7 @@ for show in netflixHistory.shows:
                 print("Adding epsiode to trakt:")
                 for watchedTime in episode.watchedAt:
                     watchedTime = re.sub('[^0-9]', '.', watchedTime)
-                    time = datetime.datetime.strptime(watchedTime + ' 20:15', '%d.%m.%y %H:%M')
+                    time = datetime.datetime.strptime(watchedTime + ' 20:15', config.CSV_DATETIME_FORMAT + ' %H:%M')
                     addInfo = {
                         "episodes": [
                             {
@@ -181,7 +181,7 @@ for movie in netflixHistory.movies:
         for watchedTime in movie.watchedAt:
             print("Adding movie to trakt:")
             watchedTime = re.sub('[^0-9]', '.', watchedTime)
-            time = datetime.datetime.strptime(watchedTime + ' 20:15', '%d.%m.%y %H:%M')
+            time = datetime.datetime.strptime(watchedTime + ' 20:15', config.CSV_DATETIME_FORMAT + ' %H:%M')
             addInfo = {
                         "movies": [
                             {
