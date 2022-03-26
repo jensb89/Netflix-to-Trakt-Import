@@ -159,8 +159,12 @@ for show in netflixHistory.shows:
             if episode.tmdbId is not None:
                 print("Adding epsiode to trakt:")
                 for watchedTime in episode.watchedAt:
-                    watchedTime = re.sub('[^0-9]', '.', watchedTime)
-                    time = datetime.datetime.strptime(watchedTime + ' 20:15', config.CSV_DATETIME_FORMAT + ' %H:%M')
+                    try:
+                        time = datetime.datetime.strptime(watchedTime + ' 20:15', config.CSV_DATETIME_FORMAT + ' %H:%M')
+                    except ValueError:
+                        # try the date with a dot (also for backwards compatbility)
+                        watchedTime = re.sub('[^0-9]', '.', watchedTime)
+                        time = datetime.datetime.strptime(watchedTime + ' 20:15', config.CSV_DATETIME_FORMAT + ' %H:%M')
                     addInfo = {
                         "episodes": [
                             {
