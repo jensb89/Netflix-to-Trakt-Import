@@ -5,6 +5,7 @@ import datetime
 import csv
 from tmdbv3api import TMDb
 from tmdbv3api import Movie, TV, Season
+from tmdbv3api.exceptions import TMDbException
 from NetflixTvShow import NetflixTvHistory
 import config
 from TraktIO import TraktIO
@@ -137,14 +138,21 @@ for show in netflixHistory.shows:
 
 tmdbMovie = Movie()
 for movie in netflixHistory.movies:
-    res = tmdbMovie.search(movie.name)
-    if res:
-        movie.tmdbId = res[0]["id"]
-        print("Found movie %s : %s (%d)" % (movie.name, res[0]["title"], movie.tmdbId))
-        logging.info("Found movie %s : %s (%d)" % (movie.name, res[0]["title"], movie.tmdbId))
-    else:
-        print("Movie not found: %s" % movie.name)
-        logging.info("Movie not found %s" % movie.name)
+    try:    
+        res = tmdbMovie.search(movie.name)
+        if res:
+            movie.tmdbId = res[0]["id"]
+            print("Found movie %s : %s (%d)" % (movie.name, res[0]["title"], movie.tmdbId))
+            logging.info("Found movie %s : %s (%d)" % (movie.name, res[0]["title"], movie.tmdbId))
+        else:
+            print("Movie not found: %s" % movie.name)
+            logging.info("Movie not found %s" % movie.name)
+    except TMDbException as e:
+        if config.TMDB_SYNC_STRICT is True:
+            raise
+        else:
+            print("Ignoring appeared exception while looking for movie %s" % movie.name)
+            logging.info("Ignoring appeared exception while looking for movie %s" % movie.name)
 
 
 logging.info(netflixHistory.getJson())

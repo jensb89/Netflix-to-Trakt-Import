@@ -48,6 +48,8 @@ For printing only the non-found shows just execute
 grep "No Tmdb ID found" Netflix2TraktImportLog.log 
 ```
 
+If execution fails with error _tmdbv3api.exceptions.TMDbException: ['query must be provided']_, set `TMDB_SYNC_STRICT` to **False**.
+
 ### Register API Access at Trakt
 * Go to "Settings" under your profile
 * Select "Your API Applications"
