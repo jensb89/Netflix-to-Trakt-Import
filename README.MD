@@ -1,5 +1,9 @@
 # Netflix To Trakt Import
 
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
+![GitHub Issues](https://img.shields.io/github/issues/jensb89/Netflix-to-Trakt-Import)
+![GitHub](https://img.shields.io/github/license/jensb89/Netflix-to-Trakt-Import)
+
 This script imports all watched Netflix tv shows and movies to trakt.tv.
 
 It uses TMDB to find the episode number and id of the show/movie by comparing the 
