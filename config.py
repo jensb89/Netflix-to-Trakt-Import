@@ -1,7 +1,7 @@
 import logging
 
-LOG_FILENAME = 'Netflix2TraktImportLog.log'
-LOG_LEVEL=logging.INFO
+LOG_FILENAME = "Netflix2TraktImportLog.log"
+LOG_LEVEL = logging.INFO
 VIEWING_HISTORY_FILENAME = "NetflixViewingHistory.csv"
 
 # Set the datetime format of the csv file (default: %d.%m.%y for 05.02.21)

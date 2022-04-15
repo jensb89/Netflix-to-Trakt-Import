@@ -198,7 +198,7 @@ for movie in netflixHistory.movies:
         else:
             print("Movie not found: %s" % movie.name)
             logging.info("Movie not found %s" % movie.name)
-    except TMDbException as e:
+    except TMDbException:
         if config.TMDB_SYNC_STRICT is True:
             raise
         else:
