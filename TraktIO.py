@@ -1,14 +1,13 @@
 from __future__ import absolute_import, division, print_function
 
-from trakt import Trakt
-
-from threading import Condition
+import json
 import logging
 import os.path
-import config 
+from threading import Condition
 
-import json
+from trakt import Trakt
 
+import config
 
 logging.basicConfig(level=config.LOG_LEVEL)
 
@@ -20,49 +19,53 @@ class TraktIO(object):
         self.authorization = None
 
         # Bind trakt events
-        Trakt.on('oauth.token_refreshed', self.on_token_refreshed)
-    
+        Trakt.on("oauth.token_refreshed", self.on_token_refreshed)
+
     def init(self):
-        Trakt.base_url = 'http://api.trakt.tv'
+        Trakt.base_url = "http://api.trakt.tv"
 
         Trakt.configuration.defaults.client(
-            id=config.TRAKT_API_CLIENT_ID,
-            secret=config.TRAKT_API_CLIENT_SECRET
+            id=config.TRAKT_API_CLIENT_ID, secret=config.TRAKT_API_CLIENT_SECRET
         )
 
-        if not(os.path.isfile("traktAuth.json")) and not self.authorization:
+        if not (os.path.isfile("traktAuth.json")) and not self.authorization:
             self.authenticate()
         elif os.path.isfile("traktAuth.json"):
-            with open('traktAuth.json') as infile:
+            with open("traktAuth.json") as infile:
                 self.authorization = json.load(infile)
 
     def addEpisodeToHistory(self, data):
         with Trakt.configuration.oauth.from_response(self.authorization):
-            Trakt["sync/history"].add(data)
-    
+            ret = Trakt["sync/history"].add(data)
+            return ret
+
     def addMovie(self, data):
         with Trakt.configuration.oauth.from_response(self.authorization):
-            Trakt["sync/history"].add(data)
+            ret = Trakt["sync/history"].add(data)
+            return ret
 
     def authenticate(self):
         if not self.is_authenticating.acquire(blocking=False):
-            print('Authentication has already been started')
+            print("Authentication has already been started")
             return False
 
         # Request new device code
-        code = Trakt['oauth/device'].code()
+        code = Trakt["oauth/device"].code()
 
-        print('Enter the code "%s" at %s to authenticate your account' % (
-            code.get('user_code'),
-            code.get('verification_url')
-        ))
+        print(
+            'Enter the code "%s" at %s to authenticate your account'
+            % (code.get("user_code"), code.get("verification_url"))
+        )
 
         # Construct device authentication poller
-        poller = Trakt['oauth/device'].poll(**code)\
-            .on('aborted', self.on_aborted)\
-            .on('authenticated', self.on_authenticated)\
-            .on('expired', self.on_expired)\
-            .on('poll', self.on_poll)
+        poller = (
+            Trakt["oauth/device"]
+            .poll(**code)
+            .on("aborted", self.on_aborted)
+            .on("authenticated", self.on_authenticated)
+            .on("expired", self.on_expired)
+            .on("poll", self.on_poll)
+        )
 
         # Start polling for authentication token
         poller.start(daemon=False)
@@ -76,7 +79,7 @@ class TraktIO(object):
         or via the "poll" event)
         """
 
-        print('Authentication aborted')
+        print("Authentication aborted")
 
         # Authentication aborted
         self.is_authenticating.acquire()
@@ -95,9 +98,9 @@ class TraktIO(object):
         # Store authorization for future calls
         self.authorization = authorization
 
-        print('Authentication successful - authorization: %r' % self.authorization)
+        print("Authentication successful - authorization: %r" % self.authorization)
 
-        with open('traktAuth.json', 'w') as f:
+        with open("traktAuth.json", "w") as f:
             json.dump(self.authorization, f)
 
         # Authentication complete
@@ -107,7 +110,7 @@ class TraktIO(object):
     def on_expired(self):
         """Device authentication expired."""
 
-        print('Authentication expired')
+        print("Authentication expired")
 
         # Authentication expired
         self.is_authenticating.acquire()
@@ -127,7 +130,8 @@ class TraktIO(object):
         # OAuth token refreshed, store authorization for future calls
         self.authorization = authorization
 
-        print('Token refreshed - authorization: %r' % self.authorization)
+        print("Token refreshed - authorization: %r" % self.authorization)
 
-#t = TraktIO()
-#t.init()
+
+# t = TraktIO()
+# t.init()
