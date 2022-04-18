@@ -3,6 +3,7 @@
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/release/python-310/)
 ![GitHub Issues](https://img.shields.io/github/issues/jensb89/Netflix-to-Trakt-Import)
 ![GitHub](https://img.shields.io/github/license/jensb89/Netflix-to-Trakt-Import)
+[![Python application](https://github.com/jensb89/Netflix-to-Trakt-Import/actions/workflows/python-app.yml/badge.svg)](https://github.com/jensb89/Netflix-to-Trakt-Import/actions/workflows/python-app.yml)
 
 This script imports all watched Netflix tv shows and movies to trakt.tv.
 
