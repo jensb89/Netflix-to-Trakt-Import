@@ -24,7 +24,7 @@ tmdb.debug = config.TMDB_DEBUG
 
 # Load Netlix Viewing History and loop through every entry
 netflixHistory = NetflixTvHistory()
-with open(config.VIEWING_HISTORY_FILENAME, mode="r") as csvFile:
+with open(config.VIEWING_HISTORY_FILENAME, mode="r", encoding="utf-8") as csvFile:
     # Make sure the file has a header "Title, Date" (first line)
     csvReader = csv.DictReader(csvFile, fieldnames=("Title", "Date"))
     line_count = 0
