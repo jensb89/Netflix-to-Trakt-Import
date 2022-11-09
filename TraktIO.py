@@ -14,6 +14,9 @@ logging.basicConfig(level=config.LOG_LEVEL)
 
 class TraktIO(object):
     def __init__(self):
+        self._episodes = []
+        self._movies = []
+
         self.is_authenticating = Condition()
 
         self.authorization = None
@@ -35,13 +38,21 @@ class TraktIO(object):
                 self.authorization = json.load(infile)
 
     def addEpisodeToHistory(self, data):
-        with Trakt.configuration.oauth.from_response(self.authorization):
-            ret = Trakt["sync/history"].add(data)
-            return ret
+        self._episodes.append(data)
 
     def addMovie(self, data):
+        self._movies.append(data)
+
+    def getData(self):
+        data = {
+            "movies": self._movies,
+            "episodes": self._episodes
+        }
+        return data
+
+    def sync(self):
         with Trakt.configuration.oauth.from_response(self.authorization):
-            ret = Trakt["sync/history"].add(data)
+            ret = Trakt["sync/history"].add(self.getData())
             return ret
 
     def authenticate(self):
