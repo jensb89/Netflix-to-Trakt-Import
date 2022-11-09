@@ -13,8 +13,9 @@ logging.basicConfig(level=config.LOG_LEVEL)
 
 
 class TraktIO(object):
-    def __init__(self, page_size=1000):
+    def __init__(self, page_size=1000, dry_run=False):
         self.authorization = None
+        self.dry_run = dry_run
         self.is_authenticating = Condition()
         self.page_size = page_size
 
@@ -59,12 +60,23 @@ class TraktIO(object):
 
     def sync(self):
         """Submit watch history to Trakt"""
-        with Trakt.configuration.oauth.from_response(self.authorization):
-            res = Trakt["sync/history"].add(self.getData())
-            print("%d episodes and %d movies added to Trakt history" % (res["added"]["episodes"], res["added"]["movies"]))
-            logging.info(res)
-            self.resetData()
-            return res
+        watchHistory = self.getData()
+        if self.dry_run:
+            print("** Skipping Trakt sync **")
+            logging.debug(watchHistory)
+            res = {
+                "added": {
+                    "movies": len(watchHistory["movies"]),
+                    "episodes": len(watchHistory["episodes"]),
+                }
+            }
+        else:
+            with Trakt.configuration.oauth.from_response(self.authorization):
+                res = Trakt["sync/history"].add(watchHistory)
+        print("* %d episodes and %d movies added to Trakt history" % (res["added"]["episodes"], res["added"]["movies"]))
+        logging.info(res)
+        self.resetData()
+        return res
 
     def authenticate(self):
         if not self.is_authenticating.acquire(blocking=False):
