@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import csv
-import datetime
 import logging
 import re
 from time import sleep
@@ -216,14 +215,8 @@ for show in netflixHistory.shows:
         for episode in season.episodes:
             if episode.tmdbId is not None:
                 for watchedTime in episode.watchedAt:
-                    try:
-                        time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
-                    except ValueError:
-                        # try the date with a dot (also for backwards compatbility)
-                        watchedTime = re.sub("[^0-9]", ".", watchedTime)
-                        time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
                     episodeData = {
-                        "watched_at": time.strftime("%Y-%m-%dT%H:%M:%S.00Z"),
+                        "watched_at": watchedTime,
                         "ids": {"tmdb": episode.tmdbId}
                     }
                     traktIO.addEpisodeToHistory(episodeData)
@@ -232,15 +225,9 @@ for movie in netflixHistory.movies:
     if movie.tmdbId is not None:
         for watchedTime in movie.watchedAt:
             print("Adding movie to trakt: %s" % movie.name)
-            try:
-                time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
-            except ValueError:
-                # try the date with a dot (also for backwards compatbility)
-                watchedTime = re.sub("[^0-9]", ".", watchedTime)
-                time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
             movieData = {
                 "title": movie.name,
-                "watched_at": time.strftime("%Y-%m-%dT%H:%M:%S.00Z"),
+                "watched_at": watchedTime,
                 "ids": {"tmdb": movie.tmdbId},
             }
             traktIO.addMovie(movieData)
