@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import csv
-import datetime
 import logging
 import re
 from time import sleep
@@ -205,52 +204,35 @@ for movie in netflixHistory.movies:
             print("Ignoring appeared exception while looking for movie %s" % movie.name)
             logging.info("Ignoring appeared exception while looking for movie %s" % movie.name)
 
-
 logging.info(netflixHistory.getJson())
-
 
 # Sync to trakt
 traktIO = TraktIO()
-traktIO.init()
+
 for show in netflixHistory.shows:
     for season in show.seasons:
+        print(f"Adding episodes to trakt: {len(season.episodes)} episodes from {show.name} season {season.number}")
         for episode in season.episodes:
             if episode.tmdbId is not None:
-                print("Adding epsiode to trakt:")
                 for watchedTime in episode.watchedAt:
-                    try:
-                        time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
-                    except ValueError:
-                        # try the date with a dot (also for backwards compatbility)
-                        watchedTime = re.sub("[^0-9]", ".", watchedTime)
-                        time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
-                    addInfo = {
-                        "episodes": [
-                            {"watched_at": time.strftime("%Y-%m-%dT%H:%M:%S.00Z"), "ids": {"tmdb": episode.tmdbId}}
-                        ]
+                    episodeData = {
+                        "watched_at": watchedTime,
+                        "ids": {"tmdb": episode.tmdbId}
                     }
-                    print(addInfo)
-                    ret = traktIO.addEpisodeToHistory(addInfo)
-                    # print(ret) # Todo: Check if epsiode was really added by checking for ret["added"]["epsiodes"] == 1
-                    # Trakt API Rate limit: 1 POST call per second
-                    sleep(1.2)
+                    traktIO.addEpisodeToHistory(episodeData)
 
 for movie in netflixHistory.movies:
     if movie.tmdbId is not None:
         for watchedTime in movie.watchedAt:
-            print("Adding movie to trakt:")
-            watchedTime = re.sub("[^0-9]", ".", watchedTime)
-            time = datetime.datetime.strptime(watchedTime + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
-            addInfo = {
-                "movies": [
-                    {
-                        "title": movie.name,
-                        "watched_at": time.strftime("%Y-%m-%dT%H:%M:%S.00Z"),
-                        "ids": {"tmdb": movie.tmdbId},
-                    }
-                ]
+            print("Adding movie to trakt: %s" % movie.name)
+            movieData = {
+                "title": movie.name,
+                "watched_at": watchedTime,
+                "ids": {"tmdb": movie.tmdbId},
             }
-            print(addInfo)
-            ret = traktIO.addMovie(addInfo)
-            # print(ret) # Todo: Check if movie was really added by checking for ret["added"]["movies"] == 1
-            sleep(1.2)
+            traktIO.addMovie(movieData)
+
+traktIO.init()
+ret = traktIO.sync()
+logging.info(ret)
+print("%d episodes and %d movies added to Trakt history" % (ret["added"]["episodes"], ret["added"]["movies"]))

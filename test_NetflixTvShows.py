@@ -13,7 +13,7 @@ def test_addSingleTvShow():
     assert netflixHistory.shows[0].name == "Peaky Blinders – Gangs of Birmingham"
     assert int(netflixHistory.shows[0].seasons[0].number) == 1
     assert netflixHistory.shows[0].seasons[0].name is None
-    assert netflixHistory.shows[0].seasons[0].episodes[0].watchedAt[0] == "03.10.21"
+    assert netflixHistory.shows[0].seasons[0].episodes[0].watchedAt[0] == "2021-10-03T20:15:00.00Z"
 
 
 def test_addMultipleTvShows():
@@ -41,4 +41,4 @@ def test_addMovie():
     netflixHistory = NetflixTvHistory()
     netflixHistory.addEntry("Spider-Man: Far from Home", "16.09.21")
     assert netflixHistory.getMovie("Spider-Man: Far from Home") is not None
-    assert netflixHistory.movies[0].watchedAt[0] == "16.09.21"
+    assert netflixHistory.movies[0].watchedAt[0] == "2021-09-16T20:15:00.00Z"

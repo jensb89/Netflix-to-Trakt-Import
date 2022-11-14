@@ -65,7 +65,6 @@ If execution fails with error _tmdbv3api.exceptions.TMDbException: ['query must 
 * Make note of your details to be used later.
 
 ## Future improvements:
-* Send multiple episodes to trakt in one call instead of making one API call per entry 
 * Check found TMDB shows/movies before sending to trakt.tv
 * Better print outputs
 * Code documentation improvement

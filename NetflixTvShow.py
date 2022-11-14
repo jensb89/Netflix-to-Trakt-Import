@@ -1,3 +1,4 @@
+import datetime
 import logging
 import re
 
@@ -128,17 +129,31 @@ class NetflixTvHistory(object):
         return jsonOut
 
 
-class NetflixMovie(object):
-    def __init__(self, movieName):
-        self.name = movieName
-        self.watchedAt = []
-        self.tmdbId = None
+class NetflixWatchableItem(object):
+    def __init__(self, name):
+        self.name = name
+        # watchedAt is a set to prevent duplicate entries
+        self._watchedAt = set()
+
+    @property
+    def watchedAt(self):
+        return list(self._watchedAt)
 
     def addWatchedDate(self, watchedDate):
-        tmp = self.watchedAt.copy()
-        tmp.append(watchedDate)
-        # Add only unique keys (https://stackoverflow.com/questions/4459703/how-to-make-lists-contain-only-distinct-element-in-python)
-        self.watchedAt = list(set(tmp))
+        try:
+            # Netflix exports only have the date. Add an arbitrary time.
+            time = datetime.datetime.strptime(watchedDate + " 20:15", config.CSV_DATETIME_FORMAT + " %H:%M")
+        except ValueError:
+            # try the date with a dot (also for backwards compatbility)
+            watchedDate = re.sub("[^0-9]", ".", watchedDate)
+            time = datetime.datetime.strptime(watchedDate + " 20:15", "%m.%d.%y %H:%M")
+        return self._watchedAt.add(time.strftime("%Y-%m-%dT%H:%M:%S.00Z"))
+
+
+class NetflixMovie(NetflixWatchableItem):
+    def __init__(self, movieName):
+        super().__init__(movieName)
+        self.tmdbId = None
 
 
 class NetflixTvShow(object):
@@ -191,18 +206,11 @@ class NetflixTvShowSeason(object):
         return None
 
 
-class NetflixTvShowEpisode(object):
-    def __init__(self, name):
-        self.name = name
-        self.watchedAt = []
+class NetflixTvShowEpisode(NetflixWatchableItem):
+    def __init__(self, episodeName):
+        super().__init__(episodeName)
         self.tmdbId = None
         self.number = None
-
-    def addWatchedDate(self, date):
-        tmp = self.watchedAt.copy()
-        tmp.append(date)
-        # Add only unique keys (https://stackoverflow.com/questions/4459703/how-to-make-lists-contain-only-distinct-element-in-python)
-        self.watchedAt = list(set(tmp))
 
     def setEpisodeNumber(self, number):
         self.number = number
