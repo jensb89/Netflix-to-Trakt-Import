@@ -13,13 +13,12 @@ logging.basicConfig(level=config.LOG_LEVEL)
 
 
 class TraktIO(object):
-    def __init__(self):
-        self._episodes = []
-        self._movies = []
-
-        self.is_authenticating = Condition()
-
+    def __init__(self, page_size=1000):
         self.authorization = None
+        self.is_authenticating = Condition()
+        self.page_size = page_size
+
+        self.resetData()
 
         # Bind trakt events
         Trakt.on("oauth.token_refreshed", self.on_token_refreshed)
@@ -39,9 +38,13 @@ class TraktIO(object):
 
     def addEpisodeToHistory(self, data):
         self._episodes.append(data)
+        if len(self._episodes) >= self.page_size:
+            self.sync()
 
     def addMovie(self, data):
         self._movies.append(data)
+        if len(self._movies) >= self.page_size:
+            self.sync()
 
     def getData(self):
         data = {
@@ -50,10 +53,18 @@ class TraktIO(object):
         }
         return data
 
+    def resetData(self):
+        self._episodes = []
+        self._movies = []
+
     def sync(self):
+        """Submit watch history to Trakt"""
         with Trakt.configuration.oauth.from_response(self.authorization):
-            ret = Trakt["sync/history"].add(self.getData())
-            return ret
+            res = Trakt["sync/history"].add(self.getData())
+            print("%d episodes and %d movies added to Trakt history" % (res["added"]["episodes"], res["added"]["movies"]))
+            logging.info(res)
+            self.resetData()
+            return res
 
     def authenticate(self):
         if not self.is_authenticating.acquire(blocking=False):

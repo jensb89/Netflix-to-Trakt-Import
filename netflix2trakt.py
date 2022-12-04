@@ -207,7 +207,7 @@ for movie in netflixHistory.movies:
 logging.info(netflixHistory.getJson())
 
 # Sync to trakt
-traktIO = TraktIO()
+traktIO = TraktIO(page_size=config.TRAKT_API_SYNC_PAGE_SIZE)
 
 for show in netflixHistory.shows:
     for season in show.seasons:
@@ -233,6 +233,4 @@ for movie in netflixHistory.movies:
             traktIO.addMovie(movieData)
 
 traktIO.init()
-ret = traktIO.sync()
-logging.info(ret)
-print("%d episodes and %d movies added to Trakt history" % (ret["added"]["episodes"], ret["added"]["movies"]))
+traktIO.sync()
