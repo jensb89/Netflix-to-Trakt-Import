@@ -12,6 +12,9 @@ TMDB_API_KEY = ""
 TMDB_LANGUAGE = "en"
 TMDB_DEBUG = False
 TMDB_SYNC_STRICT = True
+TMDB_EPISODE_LANGUAGE_SEARCH = False # more api calls, longer waiting time, 
+                                     # only useful if the tmdb language differs from en 
+                                     # and episodes cannot be found in the season overview Api calls
 
 TRAKT_API_CLIENT_ID = ""
 TRAKT_API_CLIENT_SECRET = ""

@@ -5,7 +5,7 @@ import logging
 import re
 from time import sleep
 
-from tmdbv3api import TV, Movie, Season, TMDb
+from tmdbv3api import TV, Movie, Season, TMDb, Episode
 from tmdbv3api.exceptions import TMDbException
 
 import config
@@ -48,6 +48,7 @@ logging.debug(netflixHistory.getJson())
 # Find TMDB IDs
 tmdbTv = TV()
 tmdbSeason = Season()
+tmdbEp = Episode()
 for show in netflixHistory.shows:
     logging.info("Searching %s" % show.name)
     tmdbShow = tmdbTv.search(show.name)
@@ -84,6 +85,14 @@ for show in netflixHistory.shows:
             if int(season.number) > numSeasons:
                 season.number = numSeasons  # Netflix sometimes splits seasons that are actually one (example: Lupin)
             tmdbResult = tmdbSeason.details(tv_id=showId, season_num=season.number, append_to_response="translations")
+            if config.TMDB_EPISODE_LANGUAGE_SEARCH:
+                logging.info("Searching each episode individually for season %d of %s" % (int(season.number), show.name))
+                for tmdbEpisode in tmdbResult.episodes:
+                    epInfo = tmdbEp.details(tv_id=showId, season_num=season.number, episode_num=tmdbEpisode.episode_number, append_to_response="translations")
+                    for epTranslation in epInfo.translations.translations:
+                        if epTranslation.iso_639_1 == tmdb.language:
+                            tmdbEpisode.name = epTranslation.data.name
+                    sleep(0.1)
             count = 0
             for episode in season.episodes:
                 found = False
