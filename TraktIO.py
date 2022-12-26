@@ -61,6 +61,7 @@ class TraktIO(object):
     def sync(self):
         """Submit watch history to Trakt"""
         watchHistory = self.getData()
+        res = None
         if self.dry_run:
             print("** Skipping Trakt sync **")
             logging.debug(watchHistory)
@@ -73,6 +74,10 @@ class TraktIO(object):
         else:
             with Trakt.configuration.oauth.from_response(self.authorization):
                 res = Trakt["sync/history"].add(watchHistory)
+        if res is None:
+            print("Something went wrong, Trakt sync failed! May delete the traktAuth.json file to reconnect to your Trakt account.")
+            self.resetData()
+            return res
         print("* %d episodes and %d movies added to Trakt history" % (res["added"]["episodes"], res["added"]["movies"]))
         logging.info(res)
         self.resetData()
