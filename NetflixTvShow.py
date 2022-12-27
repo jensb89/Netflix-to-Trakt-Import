@@ -77,6 +77,19 @@ class NetflixTvHistory(object):
             episodeTitle = res.group(3)
             self.addTvShowEntry(showName, None, episodeTitle, entryDate, seasonName=seasonName)
             return True
+        
+        # Check for TvShow: EpisodeTitle
+        # sometimes used in this format for the first season of a show
+        # Example: "Wednesday: Leid pro quo","29.11.22"
+        # @tricky: Also movies sometimes use this format (e.g "King Arthur: Legend of the Sword","17.01.21")
+        tvshowregex = re.compile(r"(.+): (.+)")
+        res = tvshowregex.search(entryTitle)
+        if res is not None:
+            showName = res.group(1)
+            seasonNumber = 1
+            episodeTitle = res.group(2)
+            self.addTvShowEntry(showName, seasonNumber, episodeTitle, entryDate)
+            # no return here in order to add it also as a movie (as it can have the same format)
 
         # Else the entry is a movie
         self.addMovieEntry(entryTitle, entryDate)
