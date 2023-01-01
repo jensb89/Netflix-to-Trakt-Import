@@ -66,7 +66,14 @@ for show in netflixHistory.shows:
         if season.number is None and season.name is not None:
             # Try to get season number from season name
             for i in range(1, numSeasons + 1):
-                tmp = tmdbSeason.details(tv_id=showId, season_num=i, append_to_response="translations")
+                logging.debug("Requesting show %s (id %s) season %d / %d\n" % (show.name, showId, int(i), int(numSeasons)))
+                try:
+                    tmp = tmdbSeason.details(tv_id=showId, season_num=i, append_to_response="translations")
+                except TMDbException as err:
+                    print(f"\nUnexpected error when searching for the season number of the show {show.name} "
+                          f"by the season name \"{season.name}\", error at search for season {i}/{numSeasons}: {err=}. \n"
+                          "The entry will be skipped\n")
+                    continue
                 sleep(0.1)
                 if tmp.name == season.name:
                     season.number = tmp.season_number
