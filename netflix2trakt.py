@@ -51,7 +51,8 @@ tmdbSeason = Season()
 tmdbEp = Episode()
 for show in netflixHistory.shows:
     logging.info("Searching %s" % show.name)
-    tmdbShow = tmdbTv.search(show.name)
+    if(len(show.name.strip()) != 0):
+        tmdbShow = tmdbTv.search(show.name)
     if len(tmdbShow) == 0:
         logging.warning("Show %s not found on TMDB!" % show.name)
         continue
