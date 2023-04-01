@@ -6,6 +6,7 @@ import os.path
 from threading import Condition
 
 from trakt import Trakt
+import datetime
 
 import config
 
@@ -36,6 +37,22 @@ class TraktIO(object):
         elif os.path.isfile("traktAuth.json"):
             with open("traktAuth.json") as infile:
                 self.authorization = json.load(infile)
+            if( not( self.checkAuthenticationValid() ) ):
+                print("Authorization is expired, a refresh is tried:")
+                if self.getWatchedShows() is None:
+                    print("No watched shows found, authorization might have not worked or no shows have been watched. For the first case try to remove the 'traktAuth.json' file!")
+                else:
+                    print("Wathced shows could be retrieved, authorization is working.")
+    
+    def getWatchedShows(self):
+        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
+            watched = Trakt['sync/watched'].shows()
+            return watched
+
+    def checkAuthenticationValid(self) -> bool:
+        created = self.authorization.get("created_at")
+        expired = self.authorization.get("expires_in")
+        return int(datetime.datetime.now().timestamp()) < created + expired
 
     def addEpisodeToHistory(self, data):
         self._episodes.append(data)
@@ -72,7 +89,7 @@ class TraktIO(object):
                 }
             }
         else:
-            with Trakt.configuration.oauth.from_response(self.authorization):
+            with Trakt.configuration.oauth.from_response(self.authorization): #no refresh here, because we refresh already at init
                 res = Trakt["sync/history"].add(watchHistory)
         if res is None:
             print("Something went wrong, Trakt sync failed! May delete the traktAuth.json file to reconnect to your Trakt account.")
