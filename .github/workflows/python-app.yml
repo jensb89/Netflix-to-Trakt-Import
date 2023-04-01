@@ -45,4 +45,4 @@ jobs:
       run: | 
         coverage run -m pytest
     - name: Coveralls
-      uses: coverallsapp/github-action@v1
+      uses: coverallsapp/github-action@v2
