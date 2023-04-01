@@ -44,6 +44,8 @@ python -m pip install -r requirements.txt
 Also, of course a NetflixViewingHistory.csv export file is needed. This can be obtained directly from the netflix page.
 Compare https://help.netflix.com/node/101917 for more information.
 
+Note: There is currently no check if the data is already uploaded. This means, if you use the script more than once, make sure to delete all previously synced episodes/movies from the csv file.
+
 To use the script simply call 
 ```bash
 python netflix2trakt.py
@@ -68,7 +70,6 @@ If execution fails with error _tmdbv3api.exceptions.TMDbException: ['query must 
 ## Future improvements:
 * Check found TMDB shows/movies before sending to trakt.tv
 * Better print outputs
-* Code documentation improvement
 * Use only trakt Search and make TMDB optional
 
 I did this on one weekened, so there is probably room for improvement :)
