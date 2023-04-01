@@ -4,6 +4,7 @@
 ![GitHub Issues](https://img.shields.io/github/issues/jensb89/Netflix-to-Trakt-Import)
 ![GitHub](https://img.shields.io/github/license/jensb89/Netflix-to-Trakt-Import)
 [![Python application](https://github.com/jensb89/Netflix-to-Trakt-Import/actions/workflows/python-app.yml/badge.svg)](https://github.com/jensb89/Netflix-to-Trakt-Import/actions/workflows/python-app.yml)
+[![Coverage Status](https://coveralls.io/repos/github/jensb89/Netflix-to-Trakt-Import/badge.svg?branch=master)](https://coveralls.io/github/jensb89/Netflix-to-Trakt-Import?branch=master)
 
 This script imports all watched Netflix tv shows and movies to trakt.tv.
 
