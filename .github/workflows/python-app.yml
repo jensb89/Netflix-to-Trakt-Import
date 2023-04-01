@@ -44,5 +44,6 @@ jobs:
     - name: Code coverage
       run: | 
         coverage run -m pytest
+        coverage lcov -o coverage/lcov.info
     - name: Coveralls
-      uses: coverallsapp/github-action@v2
+      uses: coverallsapp/github-action@v1
