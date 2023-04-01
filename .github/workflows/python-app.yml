@@ -44,6 +44,5 @@ jobs:
     - name: Code coverage
       run: | 
         coverage run -m pytest
-        coveralls
-    #- name: Coveralls
-    #  uses: coverallsapp/github-action@v1
+    - name: Coveralls
+      uses: coverallsapp/github-action@v1
