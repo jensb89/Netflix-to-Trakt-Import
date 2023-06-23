@@ -212,7 +212,7 @@ for show in netflixHistory.shows:
 tmdbMovie = Movie()
 for movie in netflixHistory.movies:
     try:
-        res = tmdbMovie.search(movie.name)
+        res = tmdbMovie.search(movie.name.replace(":",""))
         if res:
             movie.tmdbId = res[0]["id"]
             print("Found movie %s : %s (%d)" % (movie.name, res[0]["title"], movie.tmdbId))
