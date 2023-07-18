@@ -31,7 +31,7 @@ traktIO.init()
 netflixHistory = NetflixTvHistory()
 with open(config.VIEWING_HISTORY_FILENAME, mode="r", encoding="utf-8") as csvFile:
     # Make sure the file has a header "Title, Date" (first line)
-    csvReader = csv.DictReader(csvFile, fieldnames=("Title", "Date"))
+    csvReader = csv.DictReader(csvFile, fieldnames=("Title", "Date"), delimiter=config.CSV_DELIMITER)
     line_count = 0
     for row in csvReader:
         if line_count == 0:
@@ -41,6 +41,8 @@ with open(config.VIEWING_HISTORY_FILENAME, mode="r", encoding="utf-8") as csvFil
 
         entry = row["Title"]
         watchedAt = row["Date"]
+
+        logging.debug("Parsed CSV file entry: {} : {}".format(watchedAt, entry))
 
         # Add entry to the netflix History class to collect all shows, seasons, episodes and watch dates
         netflixHistory.addEntry(entry, watchedAt)

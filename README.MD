@@ -33,6 +33,8 @@ If no match was found at all, the episode / movie is left out.
 ## Installation
 Just clone this repo, fill in the API keys and language information in the config.py file.
 If your Netflix csv file uses a different datetime format (default: day.month.year) then change the CSV_DATETIME_FORMAT setting in the config.py file.
+Note: Use %Y for years like 2023 and %y for year entries like 23. 
+If your csv file uses a different delimiter as "," between date and entry, then change the CSV_DELIMITER option as well.
 
 See how to register API access below.
 
