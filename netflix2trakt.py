@@ -80,7 +80,7 @@ for show in netflixHistory.shows:
                     tmp = tmdbSeason.details(tv_id=showId, season_num=i, append_to_response="translations")
                 except TMDbException as err:
                     print(f"\nUnexpected error when searching for the season number of the show {show.name} "
-                          f"by the season name \"{season.name}\", error at search for season {i}/{numSeasons}: {err=}. \n"
+                          f"by the season name \"{season.name}\", error at search for season {i}/{numSeasons}: {err}. \n"
                           "The entry will be skipped\n")
                     continue
                 sleep(0.1)
