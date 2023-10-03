@@ -1,7 +1,9 @@
-Netflix2TraktImportLog.log
+*.log
+config.ini
 dev/
 .vscode/
 __pycache__
 .python-version
 *.csv
 traktAuth.json
+venv

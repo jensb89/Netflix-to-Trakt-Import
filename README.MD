@@ -19,7 +19,7 @@ With this information the season is queried from TMDB.
 If the episode name from the Netflix Export matches the episode name from the TMDB season, the Id is filled in.
 
 Otherwise, it is checked if the episode number might be already in the title of the episode.
-As a last test, it is checked if the number of episodes in the season equals the number of watched episodes. If this is the case, 
+As a last test, it is checked if the number of episodes in the season equals the number of watched episodes. If this is the case,
 the script will estimate the episode number based on the viewing history (latest watched episode = last episode of the season.)
 
 If no match was found at all, the episode / movie is left out.
@@ -32,9 +32,11 @@ If no match was found at all, the episode / movie is left out.
 
 ## Installation
 Just clone this repo, fill in the API keys and language information in the config.py file.
-If your Netflix csv file uses a different datetime format (default: day.month.year) then change the CSV_DATETIME_FORMAT setting in the config.py file.
+If your Netflix csv file uses a different datetime format (default: day.month.year) then change the
+`viewing_history_datetime_format` setting in the [`config.ini` file](README.MD#configuration).
 Note: Use %Y for years like 2023 and %y for year entries like 23. 
-If your csv file uses a different delimiter as "," between date and entry, then change the CSV_DELIMITER option as well.
+If your csv file uses a different delimiter than `,` between date and entry, then change the
+`viewing_history_delimiter` option as well.
 
 See how to register API access below.
 
@@ -46,7 +48,8 @@ python -m pip install -r requirements.txt
 Also, of course a NetflixViewingHistory.csv export file is needed. This can be obtained directly from the netflix page.
 Compare https://help.netflix.com/node/101917 for more information.
 
-Note: There is currently no check if the data is already uploaded. This means, if you use the script more than once, make sure to delete all previously synced episodes/movies from the csv file.
+Note: There is currently no check if the data is already uploaded. This means, if you use the script more than once, make
+sure to delete all previously synced episodes/movies from the csv file.
 
 To use the script simply call 
 ```bash
@@ -58,7 +61,18 @@ For printing only the non-found shows just execute
 grep "No Tmdb ID found" Netflix2TraktImportLog.log 
 ```
 
-If execution fails with error _tmdbv3api.exceptions.TMDbException: ['query must be provided']_, set `TMDB_SYNC_STRICT` to **False**.
+If execution fails with error _tmdbv3api.exceptions.TMDbException: ['query must be provided']_, set the `strict` option of the
+`TMDB` section in [`config.ini` file](README.MD#configuration) to **False**.
+
+## Configuration
+
+To customize the import options, copy [`config_default.ini`](config_default.ini)
+to `config.ini` and make your changes there.
+
+```bash
+cp config_default.ini config.ini
+# open config.ini in the editor of your choice
+```
 
 ### Register API Access at Trakt
 * Go to "Settings" under your profile

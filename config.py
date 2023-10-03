@@ -1,24 +1,36 @@
+import configparser
 import logging
+import sys
 
-LOG_FILENAME = "Netflix2TraktImportLog.log"
-LOG_LEVEL = logging.INFO
-VIEWING_HISTORY_FILENAME = "NetflixViewingHistory.csv"
+class Section(object):
+    LOGGING = 'Logging'
+    NETFLIX = 'Netflix'
+    TMDB = 'TMDB'
+    TRAKT = 'Trakt'
 
-# Set the datetime format of the csv file and the delimiter (default: %d.%m.%y for 05.02.21 and "," as delimiter between date and entry)
-# Use %Y-%m-%d for 2021-02-05 (Canada, ...)
-# For the format 17.05.2023 use the datetime format %d.%m.%Y (note the capital Y for 2023 instead of y for 23)
-CSV_DATETIME_FORMAT = "%d.%m.%y"
-CSV_DELIMITER = "," #delimiter between the entries (like "," between '"Push","28.02.23"')
 
-TMDB_API_KEY = ""
-TMDB_LANGUAGE = "en"
-TMDB_DEBUG = False
-TMDB_SYNC_STRICT = True
-TMDB_EPISODE_LANGUAGE_SEARCH = False # more api calls, longer waiting time, 
-                                     # only useful if the tmdb language differs from en 
-                                     # and episodes cannot be found in the season overview Api calls
+_config = configparser.ConfigParser()
+_config.read('config_defaults.ini')
 
-TRAKT_API_CLIENT_ID = ""
-TRAKT_API_CLIENT_SECRET = ""
-TRAKT_API_DRY_RUN = False
-TRAKT_API_SYNC_PAGE_SIZE = 1000
+# optional user configs go in config.ini
+# ignore them if we're running tests
+if "pytest" not in sys.modules: # pragma: no cover
+    _config.read('config.ini')
+
+LOG_FILENAME = _config.get(Section.LOGGING, 'filename')
+LOG_LEVEL = logging.getLevelName(_config.get(Section.LOGGING, 'level'))
+
+VIEWING_HISTORY_FILENAME = _config.get(Section.NETFLIX, 'viewing_history_filename')
+CSV_DATETIME_FORMAT = _config.get(Section.NETFLIX, 'viewing_history_datetime_format')
+CSV_DELIMITER = _config.get(Section.NETFLIX, 'viewing_history_delimiter')
+
+TMDB_API_KEY = _config.get(Section.TMDB, 'api_key')
+TMDB_LANGUAGE = _config.get(Section.TMDB, 'language')
+TMDB_DEBUG = _config.getboolean(Section.TMDB, 'debug')
+TMDB_SYNC_STRICT = _config.getboolean(Section.TMDB, 'strict')
+TMDB_EPISODE_LANGUAGE_SEARCH = _config.getboolean(Section.TMDB, 'episode_language_search')
+
+TRAKT_API_CLIENT_ID = _config.get(Section.TRAKT, 'id')
+TRAKT_API_CLIENT_SECRET = _config.get(Section.TRAKT, 'secret')
+TRAKT_API_DRY_RUN = _config.getboolean(Section.TRAKT, 'dry_run')
+TRAKT_API_SYNC_PAGE_SIZE = _config.getint(Section.TRAKT, 'page_size')
