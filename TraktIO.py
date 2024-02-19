@@ -1,12 +1,12 @@
 from __future__ import absolute_import, division, print_function
 
+import datetime
 import json
 import logging
 import os.path
 from threading import Condition
 
 from trakt import Trakt
-import datetime
 
 import config
 
@@ -37,16 +37,18 @@ class TraktIO(object):
         elif os.path.isfile("traktAuth.json"):
             with open("traktAuth.json") as infile:
                 self.authorization = json.load(infile)
-            if( not( self.checkAuthenticationValid() ) ):
+            if not (self.checkAuthenticationValid()):
                 print("Authorization is expired, a refresh is tried:")
                 if self.getWatchedShows() is None:
-                    print("No watched shows found, authorization might have not worked or no shows have been watched. For the first case try to remove the 'traktAuth.json' file!")
+                    print(
+                        "No watched shows found, authorization might have not worked or no shows have been watched. For the first case try to remove the 'traktAuth.json' file!"
+                    )
                 else:
                     print("Wathced shows could be retrieved, authorization is working.")
-    
+
     def getWatchedShows(self):
         with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            watched = Trakt['sync/watched'].shows()
+            watched = Trakt["sync/watched"].shows()
             return watched
 
     def checkAuthenticationValid(self) -> bool:
@@ -65,10 +67,7 @@ class TraktIO(object):
             self.sync()
 
     def getData(self):
-        data = {
-            "movies": self._movies,
-            "episodes": self._episodes
-        }
+        data = {"movies": self._movies, "episodes": self._episodes}
         return data
 
     def resetData(self):
@@ -88,16 +87,28 @@ class TraktIO(object):
                     "episodes": len(watchHistory["episodes"]),
                 }
             }
+            print(res)
+
         else:
-            with Trakt.configuration.oauth.from_response(self.authorization): #no refresh here, because we refresh already at init
+            # no refresh here, because we refresh already at init
+            with Trakt.configuration.oauth.from_response(self.authorization):
                 res = Trakt["sync/history"].add(watchHistory)
+                output = "* %d episodes and %d movies added to Trakt history" % (
+                    res["added"]["episodes"],
+                    res["added"]["movies"],
+                )
+                logging.info(output)
+
         if res is None:
-            print("Something went wrong, Trakt sync failed! May delete the traktAuth.json file to reconnect to your Trakt account.")
+            logging.error(
+                "Something went wrong, Trakt sync failed! May delete the traktAuth.json file to reconnect to your Trakt account."
+            )
             self.resetData()
             return res
-        print("* %d episodes and %d movies added to Trakt history" % (res["added"]["episodes"], res["added"]["movies"]))
+
         logging.info(res)
         self.resetData()
+
         return res
 
     def authenticate(self):
