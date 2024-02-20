@@ -16,6 +16,14 @@ from TraktIO import TraktIO
 
 
 def setupTMDB(tmdbKey, tmdbLanguage, tmdbDebug):
+    """
+    Sets up information to access TMDB.
+
+    :param tmdbKey: API key for TMDB
+    :param tmdbLanguage: Preferred language for TMDB
+    :param tmdbDebug: Boolean value for debug mode
+    :return: Returns `tmdb` object that contains TMDB information
+    """
     tmdb = TMDb()
     tmdb.api_key = tmdbKey
     tmdb.language = tmdbLanguage
@@ -24,11 +32,25 @@ def setupTMDB(tmdbKey, tmdbLanguage, tmdbDebug):
 
 
 def setupTrakt(traktPageSize, traktDryRun):
+    """
+    Sets up Trakt information.
+
+    :param traktPageSize: Number of items to be sync'd to Trakt at a time
+    :param traktDryRun: Boolean value to determine if identified movies/TV shows are uploaded to Trakt
+    :return: Returns `traktIO` object that contains Trakt information
+    """
     traktIO = TraktIO(page_size=traktPageSize, dry_run=traktDryRun)
     return traktIO
 
 
 def getNetflixHistory(inputFile, inputFileDelimiter):
+    """
+    Parses Netflix viewing history in CSV format.
+
+    :param inputFile: File containing Netflix viewing history
+    :param inputFileDelimiter: Delimiter used in Netflix viewing history (ex. CSV = `,`)
+    :return: Returns `netflixHistory` that contains information parsed from viewing history CSV
+    """
     # Load Netlix Viewing History and loop through every entry
     netflixHistory = NetflixTvHistory()
     with open(inputFile, mode="r", encoding="utf-8") as csvFile:
@@ -62,6 +84,14 @@ def getNetflixHistory(inputFile, inputFileDelimiter):
 
 @retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def getShowInformation(show, tmdb, languageSearch, traktIO):
+    """
+    Parse TV show information,attempt to find a match on TMDB, and add it to the Trakt class object if found.
+
+    :param show: A show that was identified when parsing Netflix viewing history
+    :param tmdb: TMDB class object that contains information related to specified account
+    :param languageSearch: Boolean value to look for translations of matching names
+    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
+    """
     # Find TMDB IDs
     tmdbTv = TV()
     tmdbSeason = Season()
@@ -200,6 +230,13 @@ def getShowInformation(show, tmdb, languageSearch, traktIO):
 
 
 def getMovieInformation(movie, strictSync, traktIO):
+    """
+    Parse movie information, attempt to find a match on TMDB, and add it to the Trakt class object if found.
+
+    :param movie: A movie that was identified when parsing Netflix viewing history
+    :param strictSync: Boolean value to determine if movie name searches should be exact matches
+    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
+    """
     tmdbMovie = Movie()
     try:
         res = tmdbMovie.search(movie.name)
@@ -223,6 +260,12 @@ def getMovieInformation(movie, strictSync, traktIO):
 
 @retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def addShowToTrakt(show, traktIO):
+    """
+    Add a show to the Trakt class object.
+
+    :param show: A show that was identified when parsing Netflix viewing history
+    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
+    """
     for season in show.seasons:
         logging.info(
             f"Adding episodes to trakt: {len(season.episodes)} episodes from {show.name} season {season.number}"
@@ -239,6 +282,12 @@ def addShowToTrakt(show, traktIO):
 
 @retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def addMovieToTrakt(movie, traktIO):
+    """
+    Add a movie to the Trakt class object.
+
+    :param movie: A movie that was identified when parsing Netflix viewing history
+    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
+    """
     if movie.tmdbId is not None:
         for watchedTime in movie.watchedAt:
             logging.info("Adding movie to trakt: %s" % movie.name)
@@ -253,6 +302,11 @@ def addMovieToTrakt(movie, traktIO):
 
 @retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def syncToTrakt(traktIO):
+    """
+    Sync information that was added to the Trakt class object.
+
+    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
+    """
     try:
         traktIO.sync()
     except Exception:
@@ -260,6 +314,9 @@ def syncToTrakt(traktIO):
 
 
 def main():
+    """
+    Main function that pulls information from config.ini to parse Netflix viewing history and adds identified matches on TMDB to Trakt.
+    """
     # Setup logging
     logging.basicConfig(filename=config.LOG_FILENAME, level=config.LOG_LEVEL)
 
