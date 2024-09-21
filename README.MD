@@ -64,6 +64,9 @@ grep "No Tmdb ID found" Netflix2TraktImportLog.log
 If execution fails with error _tmdbv3api.exceptions.TMDbException: ['query must be provided']_, set the `strict` option of the
 `TMDB` section in [`config.ini` file](README.MD#configuration) to **False**.
 
+If you get an error like: _strptime raise ValueError("time data %r does not match format %r"...) or any other related to the dates in the `NetflixViewingHistory.csv`
+Then run the file `history-dates-fixer.py` to get all dates standardized in the required format.
+
 ## Configuration
 
 To customize the import options, copy [`config_default.ini`](config_default.ini)
