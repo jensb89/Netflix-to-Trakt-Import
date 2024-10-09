@@ -26,7 +26,7 @@ class TraktIO(object):
         Trakt.on("oauth.token_refreshed", self.on_token_refreshed)
 
     def init(self):
-        Trakt.base_url = "http://api.trakt.tv"
+        Trakt.base_url = "https://api.trakt.tv"
 
         Trakt.configuration.defaults.client(
             id=config.TRAKT_API_CLIENT_ID, secret=config.TRAKT_API_CLIENT_SECRET
