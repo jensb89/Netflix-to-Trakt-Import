@@ -96,11 +96,13 @@ def getShowInformation(show, tmdb, languageSearch, traktIO):
     tmdbTv = TV()
     tmdbSeason = Season()
     tmdbEp = Episode()
+    tmdbShow = None
     try:
         if len(show.name.strip()) != 0:
             tmdbShow = tmdbTv.search(show.name)
-        if len(tmdbShow) == 0:
+        if tmdbShow is None or len(tmdbShow) == 0:
             logging.warning("Show %s not found on TMDB!" % show.name)
+            return
 
         showId = tmdbShow[0]["id"]
         details = tmdbTv.details(show_id=showId, append_to_response="")
