@@ -241,7 +241,7 @@ def getMovieInformation(movie, strictSync, traktIO):
     """
     tmdbMovie = Movie()
     try:
-        res = tmdbMovie.search(movie.name)
+        res = tmdbMovie.search(movie.name.replace(":",""))
         if res:
             movie.tmdbId = res[0]["id"]
             logging.info(
