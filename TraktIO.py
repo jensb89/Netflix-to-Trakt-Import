@@ -1,204 +1,217 @@
 from __future__ import absolute_import, division, print_function
 
-import datetime
 import json
 import logging
 import os.path
 from threading import Condition
-
+import requests
 from trakt import Trakt
-
 import config
 
 logging.basicConfig(level=config.LOG_LEVEL)
 
 
 class TraktIO(object):
-    def __init__(self, page_size=1000, dry_run=False):
+
+    def __init__(self, page_size=50, dry_run=False):
+        Trakt.configuration.defaults.client(  # pyright: ignore[reportAttributeAccessIssue]
+            id=config.TRAKT_API_CLIENT_ID,
+            secret=config.TRAKT_API_CLIENT_SECRET
+        )
+
         self.authorization = None
+        self._watched_episodes = set()
+        self._watched_movies = set()
+        self.cached_watched_episodes = set()
+        self._episodes = []
+        self._movies = []
         self.dry_run = dry_run
         self.is_authenticating = Condition()
         self.page_size = page_size
 
-        self.resetData()
+        self._initialize_auth()
 
-        # Bind trakt events
-        Trakt.on("oauth.token_refreshed", self.on_token_refreshed)
-
-    def init(self):
-        Trakt.base_url = "https://api.trakt.tv"
-
-        Trakt.configuration.defaults.client(
-            id=config.TRAKT_API_CLIENT_ID, secret=config.TRAKT_API_CLIENT_SECRET
-        )
-
-        if not (os.path.isfile("traktAuth.json")) and not self.authorization:
+    def _initialize_auth(self):
+        if not os.path.isfile("traktAuth.json"):
             self.authenticate()
-        elif os.path.isfile("traktAuth.json"):
+
+        if os.path.isfile("traktAuth.json"):
             with open("traktAuth.json") as infile:
                 self.authorization = json.load(infile)
-            if not (self.checkAuthenticationValid()):
-                print("Authorization is expired, a refresh is tried:")
-                if self.getWatchedShows() is None:
-                    print(
-                        "No watched shows found, authorization might have not worked or no shows have been watched. For the first case try to remove the 'traktAuth.json' file!"
-                    )
-                else:
-                    print("Wathced shows could be retrieved, authorization is working.")
 
-    def getWatchedShows(self):
-        with Trakt.configuration.oauth.from_response(self.authorization, refresh=True):
-            watched = Trakt["sync/watched"].shows()
-            return watched
+            if not self.checkAuthenticationValid():
+                print("Authorization is expired, attempting manual refresh...")
+                self._refresh_token()
+
+            if self.getWatchedShows() is not None:
+                print("Authorization appears valid. Watched shows retrieved.")
+                self.cacheWatchedHistory()
+            else:
+                print("No watched shows found. Token may still be invalid or no data available.")
+
+    def _refresh_token(self):
+        if not self.authorization:
+            print("Cannot refresh token, no authorization found.")
+            return
+
+        response = requests.post("https://api.trakt.tv/oauth/token", json={
+            "refresh_token": self.authorization.get("refresh_token"),
+            "client_id": config.TRAKT_API_CLIENT_ID,
+            "client_secret": config.TRAKT_API_CLIENT_SECRET,
+            "redirect_uri": config.TRAKT_REDIRECT_URI,
+            "grant_type": "refresh_token"
+        })
+
+        if response.status_code == 200:
+            self.authorization = response.json()
+            with open("traktAuth.json", "w") as outfile:
+                json.dump(self.authorization, outfile)
+            print("Token successfully refreshed manually.")
+        else:
+            print("Manual token refresh failed: %s" % response.text)
+
+    def _get_auth_headers(self):
+        if not self.authorization:
+            raise Exception("User is not authenticated.")
+
+        return {
+            "Content-Type": "application/json",
+            "trakt-api-version": "2",
+            "trakt-api-key": config.TRAKT_API_CLIENT_ID,
+            "Authorization": f"Bearer {self.authorization['access_token']}"
+        }
 
     def checkAuthenticationValid(self) -> bool:
-        created = self.authorization.get("created_at")
-        expired = self.authorization.get("expires_in")
-        return int(datetime.datetime.now().timestamp()) < created + expired
+        if not self.authorization:
+            return False
+        return "access_token" in self.authorization
 
-    def addEpisodeToHistory(self, data):
-        self._episodes.append(data)
-        if len(self._episodes) >= self.page_size:
-            self.sync()
+    def getWatchedShows(self):
+        try:
+            headers = self._get_auth_headers()
+            response = requests.get("https://api.trakt.tv/sync/watched/shows", headers=headers)
+            if response.status_code == 200:
+                json_response = response.json()
+                logging.debug("Trakt watched shows response: %s", json.dumps(json_response, indent=2))
+                return json_response
+            return None
+        except Exception as e:
+            print(f"❌ Failed to fetch watched shows: {e}")
+            return None
 
-    def addMovie(self, data):
-        self._movies.append(data)
-        if len(self._movies) >= self.page_size:
-            self.sync()
+    def cacheWatchedHistory(self):
+        try:
+            logging.info("Fetching watched episodes and movies from Trakt...")
+            shows_response = requests.get("https://api.trakt.tv/sync/watched/shows", headers=self._get_auth_headers())
+            movies_response = requests.get("https://api.trakt.tv/sync/watched/movies", headers=self._get_auth_headers())
 
-    def getData(self):
-        data = {"movies": self._movies, "episodes": self._episodes}
-        return data
+            if shows_response.status_code == 200:
+                for show in shows_response.json():
+                    for season in show.get('seasons', []):
+                        for episode in season.get('episodes', []):
+                            self._watched_episodes.add(episode.get('ids', {}).get('trakt'))
 
-    def resetData(self):
-        self._episodes = []
-        self._movies = []
+            if movies_response.status_code == 200:
+                for movie in movies_response.json():
+                    tmdb_id = movie.get('movie', {}).get('ids', {}).get('tmdb')
+                    if tmdb_id:
+                        self._watched_movies.add(tmdb_id)
+        except Exception as e:
+            logging.error(f"⚠ Error caching Trakt history: {e}")
+
+    def isWatchedMovie(self, tmdb_id: int) -> bool:
+        result = tmdb_id in self._watched_movies
+        logging.debug(f"isWatchedMovie({tmdb_id}) -> {result}")
+        return result
+
+    def getData(self) -> dict:
+        return {
+            "movies": self._movies,
+            "episodes": self._episodes
+        }
 
     def sync(self):
-        """Submit watch history to Trakt"""
-        watchHistory = self.getData()
-        res = None
         if self.dry_run:
-            print("** Skipping Trakt sync **")
-            logging.debug(watchHistory)
-            res = {
+            logging.info("Dry run enabled. Skipping actual Trakt sync.")
+            return {
                 "added": {
-                    "movies": len(watchHistory["movies"]),
-                    "episodes": len(watchHistory["episodes"]),
+                    "movies": len(self._movies),
+                    "episodes": len(self._episodes)
+                },
+                "not_found": {
+                    "movies": [],
+                    "episodes": [],
+                    "shows": []
+                },
+                "updated": {
+                    "movies": [],
+                    "episodes": []
                 }
             }
-            print(res)
 
-        else:
-            # no refresh here, because we refresh already at init
-            with Trakt.configuration.oauth.from_response(self.authorization):
-                res = Trakt["sync/history"].add(watchHistory)
-                output = "* %d episodes and %d movies added to Trakt history" % (
-                    res["added"]["episodes"],
-                    res["added"]["movies"],
-                )
-                logging.info(output)
+        headers = self._get_auth_headers()
+        payload = json.dumps(self.getData())
 
-        if res is None:
-            logging.error(
-                "Something went wrong, Trakt sync failed! May delete the traktAuth.json file to reconnect to your Trakt account."
-            )
-            self.resetData()
-            return res
+        response = requests.post("https://api.trakt.tv/sync/history", headers=headers, data=payload)
+        if response.status_code != 201:
+            raise Exception(f"Trakt sync failed: {response.status_code} - {response.text}")
 
-        logging.info(res)
-        self.resetData()
+        json_response = response.json()
+        logging.debug("Trakt sync response: %s", json.dumps(json_response, indent=2))
 
-        return res
+        # Ensure all nested fields are valid types (dicts or lists) to avoid iteration errors
+        for key in ["added", "updated", "not_found"]:
+            for subkey in ["movies", "episodes", "shows"]:
+                if key in json_response and subkey in json_response[key]:
+                    val = json_response[key][subkey]
+                    if not isinstance(val, (list, dict)):
+                        json_response[key][subkey] = []
+
+        return json_response
 
     def authenticate(self):
         if not self.is_authenticating.acquire(blocking=False):
             print("Authentication has already been started")
             return False
 
-        # Request new device code
-        code = Trakt["oauth/device"].code()
+        code_info = Trakt['oauth/device'].code()  # pyright: ignore[reportAttributeAccessIssue, reportInvalidTypeArguments]
 
         print(
-            'Enter the code "%s" at %s to authenticate your account'
-            % (code.get("user_code"), code.get("verification_url"))
+            '🔑 Enter the code "%s" at %s to authenticate your Trakt account'
+            % (code_info.get("user_code"), code_info.get("verification_url"))
         )
 
-        # Construct device authentication poller
         poller = (
-            Trakt["oauth/device"]
-            .poll(**code)
+            Trakt["oauth/device"]  # pyright: ignore[reportAttributeAccessIssue, reportInvalidTypeArguments]
+            .poll(**code_info) # pyright: ignore[reportAttributeAccessIssue]
             .on("aborted", self.on_aborted)
             .on("authenticated", self.on_authenticated)
             .on("expired", self.on_expired)
             .on("poll", self.on_poll)
         )
 
-        # Start polling for authentication token
         poller.start(daemon=False)
-
-        # Wait for authentication to complete
         return self.is_authenticating.wait()
 
     def on_aborted(self):
-        """Device authentication aborted.
-        Triggered when device authentication was aborted (either with `DeviceOAuthPoller.stop()`
-        or via the "poll" event)
-        """
-
         print("Authentication aborted")
-
-        # Authentication aborted
-        self.is_authenticating.acquire()
-        self.is_authenticating.notify_all()
-        self.is_authenticating.release()
+        self._notify_auth_complete()
 
     def on_authenticated(self, authorization):
-        """Device authenticated.
-        :param authorization: Authentication token details
-        :type authorization: dict
-        """
-
-        # Acquire condition
-        self.is_authenticating.acquire()
-
-        # Store authorization for future calls
         self.authorization = authorization
-
-        print("Authentication successful - authorization: %r" % self.authorization)
-
+        print("✅ Authentication successful!")
         with open("traktAuth.json", "w") as f:
             json.dump(self.authorization, f)
-
-        # Authentication complete
-        self.is_authenticating.notify_all()
-        self.is_authenticating.release()
+        self._notify_auth_complete()
 
     def on_expired(self):
-        """Device authentication expired."""
-
         print("Authentication expired")
+        self._notify_auth_complete()
 
-        # Authentication expired
+    def on_poll(self, callback):
+        callback(True)
+
+    def _notify_auth_complete(self):
         self.is_authenticating.acquire()
         self.is_authenticating.notify_all()
         self.is_authenticating.release()
-
-    def on_poll(self, callback):
-        """Device authentication poll.
-        :param callback: Call with `True` to continue polling, or `False` to abort polling
-        :type callback: func
-        """
-
-        # Continue polling
-        callback(True)
-
-    def on_token_refreshed(self, authorization):
-        # OAuth token refreshed, store authorization for future calls
-        self.authorization = authorization
-
-        print("Token refreshed - authorization: %r" % self.authorization)
-
-
-# t = TraktIO()
-# t.init()
