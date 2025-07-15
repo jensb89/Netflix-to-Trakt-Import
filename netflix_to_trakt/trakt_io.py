@@ -112,13 +112,21 @@ class TraktIO(object):
         return res
 
     def authenticate(self):
-        if not self.is_authenticating.acquire(blocking=False):
+
+        #acquire() was called non-blocking
+        # if not self.is_authenticating.acquire(blocking=False):
+        #    print("Authentication has already been started")
+        #    return False
+
+        with self.is_authenticating:
+        if getattr(self, '_auth_in_progress', False):
             print("Authentication has already been started")
             return False
 
+        self._auth_in_progress = True
+
         # Request new device code
         code = Trakt["oauth/device"].code()
-
         print(
             'Enter the code "%s" at %s to authenticate your account'
             % (code.get("user_code"), code.get("verification_url"))
@@ -138,7 +146,8 @@ class TraktIO(object):
         poller.start(daemon=False)
 
         # Wait for authentication to complete
-        return self.is_authenticating.wait()
+        # Condition.wait() expects the lock to be acquired first
+        self.is_authenticating.wait()
 
     def on_aborted(self):
         """Device authentication aborted.
@@ -146,12 +155,11 @@ class TraktIO(object):
         or via the "poll" event)
         """
 
-        print("Authentication aborted")
+        with self.is_authenticating:
+            logging.warning("Authentication aborted by user or system.")
 
-        # Authentication aborted
-        self.is_authenticating.acquire()
+        self._auth_in_progress = False
         self.is_authenticating.notify_all()
-        self.is_authenticating.release()
 
     def on_authenticated(self, authorization):
         """Device authenticated.
@@ -159,30 +167,26 @@ class TraktIO(object):
         :type authorization: dict
         """
 
-        # Acquire condition
-        self.is_authenticating.acquire()
+        with self.is_authenticating:
+            self.authorization = authorization
 
-        # Store authorization for future calls
-        self.authorization = authorization
-
-        print("Authentication successful - authorization: %r" % self.authorization)
-
+        # Save the token for future use
         with open("traktAuth.json", "w") as f:
             json.dump(self.authorization, f)
 
-        # Authentication complete
+        logging.info("Authentication successful: %r", self.authorization)
+
+        self._auth_in_progress = False
         self.is_authenticating.notify_all()
-        self.is_authenticating.release()
 
     def on_expired(self):
         """Device authentication expired."""
-
-        print("Authentication expired")
-
         # Authentication expired
-        self.is_authenticating.acquire()
+        with self.is_authenticating:
+        logging.warning("Authentication expired. Please try again.")
+
+        self._auth_in_progress = False
         self.is_authenticating.notify_all()
-        self.is_authenticating.release()
 
     def on_poll(self, callback):
         """Device authentication poll.
@@ -198,6 +202,9 @@ class TraktIO(object):
         self.authorization = authorization
 
         print("Token refreshed - authorization: %r" % self.authorization)
+
+        with open("traktAuth.json", "w") as f:
+        json.dump(self.authorization, f)
 
 
 # t = TraktIO()

@@ -11,7 +11,7 @@ class Section(object):
 
 
 _config = configparser.ConfigParser()
-_config.read("config_defaults.ini")
+_config.read("./config_defaults.ini")
 
 # optional user configs go in config.ini
 # ignore them if we're running tests
