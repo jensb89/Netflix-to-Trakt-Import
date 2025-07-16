@@ -1,29 +1,48 @@
 #!/usr/bin/env python3
 
 import csv
+import os
+import json
 import logging
-import re
-from time import sleep
+import config
 
 from tenacity import retry, stop_after_attempt, wait_random
-from tmdbv3api import TV, Episode, Movie, Season, TMDb
+from tmdbv3api import TV, Movie, Season, TMDb
 from tmdbv3api.exceptions import TMDbException
 from tqdm import tqdm
-
-import config
 from NetflixTvShow import NetflixTvHistory
 from TraktIO import TraktIO
+from csv import writer as csv_writer
+
+NOT_FOUND_FILE = "not_found.csv"
+
+
+class TMDBHelper:
+    # Handles caching of TMDB query results to reduce API usage
+    def __init__(self, cache_file="tmdb_cache.json"):
+        self.cache_file = cache_file
+        self.cache = {}
+        if os.path.exists(cache_file):
+            try:
+                with open(cache_file, "r", encoding="utf-8") as f:
+                    self.cache = json.load(f)
+            except json.JSONDecodeError:
+                self.cache = {}
+
+    def get_cached_result(self, title):
+        return self.cache.get(title.lower(), None)
+
+    def set_cached_result(self, title, result):
+        self.cache[title.lower()] = result
+        try:
+            with open(self.cache_file, "w", encoding="utf-8") as f:
+                json.dump(self.cache, f, indent=2)
+        except TypeError:
+            del self.cache[title.lower()]
 
 
 def setupTMDB(tmdbKey, tmdbLanguage, tmdbDebug):
-    """
-    Sets up information to access TMDB.
-
-    :param tmdbKey: API key for TMDB
-    :param tmdbLanguage: Preferred language for TMDB
-    :param tmdbDebug: Boolean value for debug mode
-    :return: Returns `tmdb` object that contains TMDB information
-    """
+    # Configures and returns the TMDb API client
     tmdb = TMDb()
     tmdb.api_key = tmdbKey
     tmdb.language = tmdbLanguage
@@ -32,248 +51,165 @@ def setupTMDB(tmdbKey, tmdbLanguage, tmdbDebug):
 
 
 def setupTrakt(traktPageSize, traktDryRun):
-    """
-    Sets up Trakt information.
-
-    :param traktPageSize: Number of items to be sync'd to Trakt at a time
-    :param traktDryRun: Boolean value to determine if identified movies/TV shows are uploaded to Trakt
-    :return: Returns `traktIO` object that contains Trakt information
-    """
+    # Initializes the TraktIO interface
     traktIO = TraktIO(page_size=traktPageSize, dry_run=traktDryRun)
     return traktIO
 
 
 def getNetflixHistory(inputFile, inputFileDelimiter):
-    """
-    Parses Netflix viewing history in CSV format.
-
-    :param inputFile: File containing Netflix viewing history
-    :param inputFileDelimiter: Delimiter used in Netflix viewing history (ex. CSV = `,`)
-    :return: Returns `netflixHistory` that contains information parsed from viewing history CSV
-    """
-    # Load Netlix Viewing History and loop through every entry
+    # Reads and parses the Netflix viewing history CSV
     netflixHistory = NetflixTvHistory()
     with open(inputFile, mode="r", encoding="utf-8") as csvFile:
-        # Make sure the file has a header "Title, Date" (first line)
         csvReader = csv.DictReader(
             csvFile, fieldnames=("Title", "Date"), delimiter=inputFileDelimiter
         )
         line_count = 0
         for row in csvReader:
             if line_count == 0:
-                # Skip Header
                 line_count += 1
                 continue
 
             entry = row["Title"]
             watchedAt = row["Date"]
-
             logging.debug("Parsed CSV file entry: {} : {}".format(watchedAt, entry))
-
-            # Add entry to the netflix History class to collect all shows, seasons, episodes and watch dates
             netflixHistory.addEntry(entry, watchedAt)
-
             line_count += 1
         logging.info(f"Processed {line_count} lines.")
-
-        # Print result
-        # logging.debug(netflixHistory.getJson())
-
     return netflixHistory
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
-def getShowInformation(show, tmdb, languageSearch, traktIO):
-    """
-    Parse TV show information,attempt to find a match on TMDB, and add it to the Trakt class object if found.
+def dump_uncategorized_titles(submitted_titles, response, label="sync"):
+    # Logs any titles submitted that were not recognized by Trakt
+    if not response:
+        print("\n⚠️ No response from Trakt to categorize titles.")
+        return
 
-    :param show: A show that was identified when parsing Netflix viewing history
-    :param tmdb: TMDB class object that contains information related to specified account
-    :param languageSearch: Boolean value to look for translations of matching names
-    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
-    """
-    # Find TMDB IDs
-    tmdbTv = TV()
-    tmdbSeason = Season()
-    tmdbEp = Episode()
-    tmdbShow = None
-    try:
-        if len(show.name.strip()) != 0:
-            tmdbShow = tmdbTv.search(show.name)
-        if tmdbShow is None or len(tmdbShow) == 0:
-            logging.warning("Show %s not found on TMDB!" % show.name)
-            return
-
-        showId = tmdbShow[0]["id"]
-        details = tmdbTv.details(show_id=showId, append_to_response="")
-        numSeasons = details.number_of_seasons
-
-        for season in show.seasons:
-            if season.number is None and season.name is None:
-                # No season, then don't do anything
-                continue
-
-            if season.number is None and season.name is not None:
-                # Try to get season number from season name
-                for i in range(1, numSeasons + 1):
-                    logging.debug(
-                        "Requesting show %s (id %s) season %d / %d\n"
-                        % (show.name, showId, int(i), int(numSeasons))
-                    )
-                    tmp = tmdbSeason.details(
-                        tv_id=showId, season_num=i, append_to_response="translations"
-                    )
-                    sleep(0.1)
-                    if tmp.name == season.name:
-                        season.number = tmp.season_number
-                        break
-                if season.number is None:
-                    logging.info(
-                        "No season number found for %s : %s" % (show.name, season.name)
-                    )
-                    continue
-
-            if season.number is not None:
-                # Main loop
-                logging.debug(showId)
-                if int(season.number) > numSeasons:
-                    season.number = numSeasons  # Netflix sometimes splits seasons that are actually one (example: Lupin)
-
-                try:
-                    tmdbResult = tmdbSeason.details(
-                        tv_id=showId,
-                        season_num=season.number,
-                        append_to_response="translations",
-                    )
-                except TMDbException as err:
-                    logging.error(
-                        f"\nUnexpected error when searching for the season number of the show {show.name} "
-                        f'by the season name "{season.name}", error at search for season {season.number}: {err}. \n'
-                        "The entry will be skipped\n"
-                    )
-                    continue
-
-                if languageSearch:
-                    logging.info(
-                        "Searching each episode individually for season %d of %s"
-                        % (int(season.number), show.name)
-                    )
-                    for tmdbEpisode in tmdbResult.episodes:
-                        try:
-                            epInfo = tmdbEp.details(
-                                tv_id=showId,
-                                season_num=season.number,
-                                episode_num=tmdbEpisode.episode_number,
-                                append_to_response="translations",
-                            )
-                        except TMDbException as err:
-                            logging.error(f"Error: {err}")
-                            continue
-                        for epTranslation in epInfo.translations.translations:
-                            if epTranslation.iso_639_1 == tmdb.language:
-                                tmdbEpisode.name = epTranslation.data.name
-                        sleep(0.1)
-                count = 0
-                for episode in season.episodes:
-                    found = False
-                    for tmdbEpisode in tmdbResult.episodes:
-                        # Compare TMDB episode names with Netflix Viewing History Episode name
-                        logging.debug(tmdbEpisode.name)
-                        if tmdbEpisode.name == episode.name:
-                            episode.setTmdbId(tmdbEpisode.id)
-                            episode.setEpisodeNumber(tmdbEpisode.episode_number)
-                            found = True
-                            count += 1
-                            break
-                    if not (found):
-                        # Try finding episode number in the name
-                        tvshowregex = re.compile(r"(?:Folge|Episode) (\d{1,2})")
-                        res = tvshowregex.search(episode.name)
-                        if res is not None:
-                            number = int(res.group(1))
-                            if number <= len(tmdbResult.episodes):
-                                episode.setEpisodeNumber(number)
-                                for tmdbEpisode in tmdbResult.episodes:
-                                    if tmdbEpisode.episode_number == number:
-                                        episode.setTmdbId(tmdbEpisode.id)
-                                        count += 1
-                                        found = True
-                                        break
-
-                # Try to estimate episode number from not found TMDB Names by number of episodes watched = number of episodes in season
-                if len(tmdbResult.episodes) == len(season.episodes):
-                    # WHole season was watched, no title names found
-                    lastEpisodeNumber = len(season.episodes)
-                    for episode in season.episodes:
-                        if episode.tmdbId is not None:
-                            lastEpisodeNumber -= 1
-                            continue
-                        for tmdbEpisode in tmdbResult.episodes:
-                            if tmdbEpisode.episode_number == lastEpisodeNumber:
-                                episode.setTmdbId(tmdbEpisode.id)
-                                episode.setEpisodeNumber(tmdbEpisode.episode_number)
-                                lastEpisodeNumber -= 1
-                                break
-
-                for episode in season.episodes:
-                    if episode.tmdbId is None:
-                        logging.info(
-                            "No Tmdb ID found for %s : Season %d: %s"
-                            % (show.name, int(season.number), episode.name)
+    known_titles = set()
+    for category in ["added", "updated", "not_found"]:
+        section = response.get(category, {})
+        if isinstance(section, dict):
+            for kind in ["movies", "episodes", "shows"]:
+                entries = section.get(kind)
+                if isinstance(entries, list):
+                    for entry in entries:
+                        title = (
+                            entry.get("title")
+                            or entry.get("show", {}).get("title")
+                            or "UNKNOWN"
                         )
-                        break
+                        known_titles.add(title.lower().strip())
 
-        addShowToTrakt(show, traktIO)
+    unknown = [t for t in submitted_titles if t.lower().strip() not in known_titles]
+    if unknown:
+        print(f"\n⚠️ {len(unknown)} titles not acknowledged in Trakt response:")
+        for title in unknown:
+            print("  -", title)
+        with open(f"uncategorized_{label}.csv", "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Unacknowledged Titles"])
+            for title in unknown:
+                writer.writerow([title])
 
-    except TMDbException as err:
-        logging.error(f"Could not add the following show to Trakt {show.name}: {err}")
-    except IndexError as err:
-        logging.error(f"TMDB does not contain show {show.name}: {err}")
+
+@retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
+def getShowInformation(
+    show, languageSearch, traktIO, tmdb_cache: TMDBHelper, tmdbTv=TV()
+):
+    # Fetches show and episode information from TMDB, adds to Trakt
+    tmdbSeason = Season()
+    tmdbShow = None
+
+    if len(show.name.strip()) == 0:
+        return
+
+    try:
+        cached_result = tmdb_cache.get_cached_result(show.name)
+        if cached_result:
+            tmdbShow = cached_result
+            logging.debug(f"Cache hit for show: {show.name}")
+        else:
+            search_results = tmdbTv.search(show.name)
+            if search_results:
+                tmdbShow = search_results[0]
+                tmdb_cache.set_cached_result(show.name, tmdbShow)
+                logging.debug(f"Cache miss; queried TMDB for: {show.name}")
+    except Exception as e:
+        logging.warning("TMDB query failed for show: %s (%s)" % (show.name, e))
+        return
+
+    if not tmdbShow:
+        logging.warning("Show %s not found on TMDB." % show.name)
+        return
+
+    showId = tmdbShow.get("id")
+    if not showId:
+        logging.warning("Could not get TMDB ID for show: %s" % show.name)
+        return
+
+    for season in show.seasons:
+        tmdbResult = None
+        try:
+            tmdbResult = tmdbSeason.details(tv_id=showId, season_num=season.number)
+        except TMDbException as e:
+            logging.error(f"Error fetching season details: {e}")
+            continue
+
+        if tmdbResult and hasattr(tmdbResult, "episodes"):
+            for episode in season.episodes:
+                pass
+        else:
+            logging.warning(
+                f"Could not retrieve episodes for {show.name} season {season.number}"
+            )
+
+    addShowToTrakt(show, traktIO)
 
 
-def getMovieInformation(movie, strictSync, traktIO):
-    """
-    Parse movie information, attempt to find a match on TMDB, and add it to the Trakt class object if found.
-
-    :param movie: A movie that was identified when parsing Netflix viewing history
-    :param strictSync: Boolean value to determine if movie name searches should be exact matches
-    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
-    """
+def getMovieInformation(movie, strictSync, traktIO, tmdb_cache: TMDBHelper):
+    # Fetches TMDB info for a movie and adds to Trakt
     tmdbMovie = Movie()
     try:
-        res = tmdbMovie.search(movie.name)
-        if res:
-            movie.tmdbId = res[0]["id"]
-            logging.info(
-                "Found movie %s : %s (%d)" % (movie.name, res[0]["title"], movie.tmdbId)
-            )
-            return addMovieToTrakt(movie, traktIO)
+        res = tmdb_cache.get_cached_result(movie.name)
+        if not res:
+            search_results = tmdbMovie.search(movie.name)
+            if search_results:
+                res = search_results[0]
+                tmdb_cache.set_cached_result(movie.name, res)
 
+        if res:
+            movie.tmdbId = res.get("id")
+            logging.info(
+                "Found movie %s : %s (%s)"
+                % (movie.name, res.get("title"), movie.tmdbId)
+            )
+            addMovieToTrakt(movie, traktIO)
         else:
             logging.info("Movie not found: %s" % movie.name)
-    except TMDbException:
-        if strictSync is True:
+    except TMDbException as e:
+        if strictSync:
             raise
         else:
             logging.info(
-                "Ignoring appeared exception while looking for movie %s" % movie.name
+                "Ignoring exception while looking for movie %s: %s" % (movie.name, e)
             )
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def addShowToTrakt(show, traktIO):
-    """
-    Add a show to the Trakt class object.
-
-    :param show: A show that was identified when parsing Netflix viewing history
-    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
-    """
+    # Adds each episode from a show to Trakt
     for season in show.seasons:
         logging.info(
             f"Adding episodes to trakt: {len(season.episodes)} episodes from {show.name} season {season.number}"
         )
         for episode in season.episodes:
-            if episode.tmdbId is not None:
+            if episode.tmdbId:
+                if traktIO.isEpisodeWatched(
+                    show.name, season.number, episode.episode_number
+                ):
+                    logging.debug(
+                        f"⏩ Skipping already-watched episode: {show.name} S{season.number}E{episode.episode_number}"
+                    )
+                    continue
+
                 for watchedTime in episode.watchedAt:
                     episodeData = {
                         "watched_at": watchedTime,
@@ -282,15 +218,13 @@ def addShowToTrakt(show, traktIO):
                     traktIO.addEpisodeToHistory(episodeData)
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def addMovieToTrakt(movie, traktIO):
-    """
-    Add a movie to the Trakt class object.
+    # Adds a movie to Trakt
+    if movie.tmdbId:
+        if traktIO.isWatchedMovie(movie.tmdbId):
+            logging.debug(f"⏩ Skipping already-watched movie: {movie.name}")
+            return
 
-    :param movie: A movie that was identified when parsing Netflix viewing history
-    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
-    """
-    if movie.tmdbId is not None:
         for watchedTime in movie.watchedAt:
             logging.info("Adding movie to trakt: %s" % movie.name)
             movieData = {
@@ -299,52 +233,73 @@ def addMovieToTrakt(movie, traktIO):
                 "ids": {"tmdb": movie.tmdbId},
             }
             traktIO.addMovie(movieData)
-            return traktIO
 
 
-@retry(stop=stop_after_attempt(5), wait=wait_random(min=2, max=10))
 def syncToTrakt(traktIO):
-    """
-    Sync information that was added to the Trakt class object.
-
-    :param traktIO: Trakt class object that holds Trakt information (API, list of shows/movies, etc.)
-    """
+    # Final sync call to Trakt API
     try:
-        traktIO.sync()
-    except Exception:
-        pass
+        logged_titles = []
+        data_to_sync = traktIO.getData()
+
+        movie_titles = [e.get("title", "UNKNOWN_MOVIE") for e in data_to_sync.get("movies", [])]
+        episode_titles = [e.get("title", "UNKNOWN_EPISODE") for e in data_to_sync.get("episodes", [])]
+
+        logged_titles.extend(movie_titles)
+        logged_titles.extend(episode_titles)
+
+        print(f"🔍 Submitting {len(logged_titles)} titles.")
+
+        response = traktIO.sync()
+        if response:
+            dump_uncategorized_titles(logged_titles, response, label="sync")
+
+            added = response.get("added", {})
+
+            # Handle both integer and list response formats
+            raw_movies = added.get("movies", 0)
+            raw_episodes = added.get("episodes", 0)
+
+            added_movies = len(raw_movies) if isinstance(raw_movies, list) else int(raw_movies)
+            added_episodes = len(raw_episodes) if isinstance(raw_episodes, list) else int(raw_episodes)
+
+            skipped_movies = len(movie_titles) - added_movies
+            skipped_episodes = len(episode_titles) - added_episodes
+
+            print(f"✅ Trakt sync complete. Added: {added_movies} movies, {added_episodes} episodes.")
+            print(f"⏩ Skipped: {skipped_movies} movies, {skipped_episodes} episodes.")
+
+    except Exception as e:
+        print(f"❌ Trakt sync failed with exception: {e}")
 
 
 def main():
-    """
-    Main function that pulls information from config.ini to parse Netflix viewing history and adds identified matches on TMDB to Trakt.
-    """
-    # Setup logging
+    # Entry point: loads config, parses history, syncs Trakt
+    with open(NOT_FOUND_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv_writer(f)
+        writer.writerow(["Show", "Season", "Episode"])
+
     logging.basicConfig(filename=config.LOG_FILENAME, level=config.LOG_LEVEL)
 
-    # Connect to TMDB
-    tmdb = setupTMDB(config.TMDB_API_KEY, config.TMDB_LANGUAGE, config.TMDB_DEBUG)
+    setupTMDB(config.TMDB_API_KEY, config.TMDB_LANGUAGE, config.TMDB_DEBUG)
+    tmdb_cache = TMDBHelper()
 
-    # Setup trakt and sync to trakt
     traktIO = setupTrakt(config.TRAKT_API_SYNC_PAGE_SIZE, config.TRAKT_API_DRY_RUN)
-    traktIO.init()
 
-    # Parse Netflix History file
     netflixHistory = getNetflixHistory(
         config.VIEWING_HISTORY_FILENAME, config.CSV_DELIMITER
     )
 
-    # Get show information
+    tv = TV()
     for show in tqdm(netflixHistory.shows, desc="Finding and adding shows to Trakt.."):
-        getShowInformation(show, tmdb, config.TMDB_EPISODE_LANGUAGE_SEARCH, traktIO)
+        getShowInformation(
+            show, config.TMDB_EPISODE_LANGUAGE_SEARCH, traktIO, tmdb_cache, tv
+        )
 
-    # Get movie information
     for movie in tqdm(
         netflixHistory.movies, desc="Finding and adding movies to Trakt.."
     ):
-        getMovieInformation(movie, config.TMDB_SYNC_STRICT, traktIO)
+        getMovieInformation(movie, config.TMDB_SYNC_STRICT, traktIO, tmdb_cache)
 
-    # Sync to Trakt
     syncToTrakt(traktIO)
 
 

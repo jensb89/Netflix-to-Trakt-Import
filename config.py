@@ -35,5 +35,6 @@ TMDB_EPISODE_LANGUAGE_SEARCH = _config.getboolean(
 
 TRAKT_API_CLIENT_ID = _config.get(Section.TRAKT, "id")
 TRAKT_API_CLIENT_SECRET = _config.get(Section.TRAKT, "secret")
+TRAKT_REDIRECT_URI = _config.get(Section.TRAKT, "TRAKT_REDIRECT_URI")
 TRAKT_API_DRY_RUN = _config.getboolean(Section.TRAKT, "dry_run")
 TRAKT_API_SYNC_PAGE_SIZE = _config.getint(Section.TRAKT, "page_size")
