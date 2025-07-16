@@ -18,6 +18,7 @@ NOT_FOUND_FILE = "not_found.csv"
 
 
 class TMDBHelper:
+    # Handles caching of TMDB query results to reduce API usage
     def __init__(self, cache_file="tmdb_cache.json"):
         self.cache_file = cache_file
         self.cache = {}
@@ -41,6 +42,7 @@ class TMDBHelper:
 
 
 def setupTMDB(tmdbKey, tmdbLanguage, tmdbDebug):
+    # Configures and returns the TMDb API client
     tmdb = TMDb()
     tmdb.api_key = tmdbKey
     tmdb.language = tmdbLanguage
@@ -49,11 +51,13 @@ def setupTMDB(tmdbKey, tmdbLanguage, tmdbDebug):
 
 
 def setupTrakt(traktPageSize, traktDryRun):
+    # Initializes the TraktIO interface
     traktIO = TraktIO(page_size=traktPageSize, dry_run=traktDryRun)
     return traktIO
 
 
 def getNetflixHistory(inputFile, inputFileDelimiter):
+    # Reads and parses the Netflix viewing history CSV
     netflixHistory = NetflixTvHistory()
     with open(inputFile, mode="r", encoding="utf-8") as csvFile:
         csvReader = csv.DictReader(
@@ -75,6 +79,7 @@ def getNetflixHistory(inputFile, inputFileDelimiter):
 
 
 def dump_uncategorized_titles(submitted_titles, response, label="sync"):
+    # Logs any titles submitted that were not recognized by Trakt
     if not response:
         print("\n⚠️ No response from Trakt to categorize titles.")
         return
@@ -110,6 +115,7 @@ def dump_uncategorized_titles(submitted_titles, response, label="sync"):
 def getShowInformation(
     show, languageSearch, traktIO, tmdb_cache: TMDBHelper, tmdbTv=TV()
 ):
+    # Fetches show and episode information from TMDB, adds to Trakt
     tmdbSeason = Season()
     tmdbShow = None
 
@@ -160,6 +166,7 @@ def getShowInformation(
 
 
 def getMovieInformation(movie, strictSync, traktIO, tmdb_cache: TMDBHelper):
+    # Fetches TMDB info for a movie and adds to Trakt
     tmdbMovie = Movie()
     try:
         res = tmdb_cache.get_cached_result(movie.name)
@@ -188,6 +195,7 @@ def getMovieInformation(movie, strictSync, traktIO, tmdb_cache: TMDBHelper):
 
 
 def addShowToTrakt(show, traktIO):
+    # Adds each episode from a show to Trakt
     for season in show.seasons:
         logging.info(
             f"Adding episodes to trakt: {len(season.episodes)} episodes from {show.name} season {season.number}"
@@ -211,6 +219,7 @@ def addShowToTrakt(show, traktIO):
 
 
 def addMovieToTrakt(movie, traktIO):
+    # Adds a movie to Trakt
     if movie.tmdbId:
         if traktIO.isWatchedMovie(movie.tmdbId):
             logging.debug(f"⏩ Skipping already-watched movie: {movie.name}")
@@ -227,6 +236,7 @@ def addMovieToTrakt(movie, traktIO):
 
 
 def syncToTrakt(traktIO):
+    # Final sync call to Trakt API
     try:
         logged_titles = []
         data_to_sync = traktIO.getData()
@@ -263,6 +273,7 @@ def syncToTrakt(traktIO):
 
 
 def main():
+    # Entry point: loads config, parses history, syncs Trakt
     with open(NOT_FOUND_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv_writer(f)
         writer.writerow(["Show", "Season", "Episode"])
